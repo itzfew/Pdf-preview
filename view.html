@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDF Viewer</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.2/pdf.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
             font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 20px;
-            background: #f4f4f4;
+            background: linear-gradient(to bottom, #f4f4f4, #eaeaea);
         }
         h1 {
             text-align: center;
@@ -21,12 +22,21 @@
             justify-content: center;
             align-items: center;
             margin-bottom: 20px;
+            gap: 10px;
         }
-        #zoom-percent {
-            margin: 0 10px;
-            font-weight: bold;
-            font-size: 20px;
-            color: #333;
+        #controls button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        #controls button:hover {
+            background-color: #0056b3;
+            transform: translateY(-2px);
         }
         #pages {
             display: flex;
@@ -40,16 +50,26 @@
             margin: 10px 0;
             background-color: white;
             overflow: hidden;
+            max-width: 100%;
+        }
+        @media (max-width: 768px) {
+            #controls {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
     <h1>PDF Viewer</h1>
-    <div id="controls" style="display: none;">
-        <button id="zoom-in">Zoom In</button>
-        <div id="zoom-percent">60%</div>
-        <button id="zoom-out">Zoom Out</button>
-        <button id="zoom-reset">Reset Zoom</button>
+    <div id="controls">
+        <button id="prev-page"><i class="fas fa-chevron-left"></i> Previous</button>
+        <button id="next-page"><i class="fas fa-chevron-right"></i> Next</button>
+        <div id="zoom-controls">
+            <button id="zoom-in"><i class="fas fa-search-plus"></i></button>
+            <div id="zoom-percent">60%</div>
+            <button id="zoom-out"><i class="fas fa-search-minus"></i></button>
+            <button id="zoom-reset"><i class="fas fa-redo"></i></button>
+        </div>
     </div>
     <div id="pages"></div>
 
@@ -62,7 +82,7 @@
         let pdfDocument = null;
         let currentPage = 1;
         let totalPages = 0;
-        let interval = null;
+        let curWidth = 60;
 
         function fetchPDF(url) {
             fetch(url)
@@ -82,82 +102,71 @@
 
         function renderPDF(pdf) {
             pdfDocument = pdf;
-            currentPage = 1;
-            document.querySelector("#pages").innerHTML = "";
-            zoomReset();
             totalPages = pdf.numPages;
-
-            for (let i = 0; i < pdf.numPages; i++) {
-                (function(pageNum) {
-                    pdf.getPage(pageNum + 1).then(function(page) {
-                        const canvas = document.createElement("canvas");
-                        canvas.className = "page";
-                        document.querySelector("#pages").appendChild(canvas);
-                        const viewport = page.getViewport({ scale: 2.0 });
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-
-                        page.render({
-                            canvasContext: canvas.getContext('2d'),
-                            viewport: viewport
-                        }).promise.then(function() {
-                            console.log('Page rendered');
-                        });
-                    });
-                })(i);
-            }
-            // Start automatic page navigation
-            startAutoSlide();
-        }
-
-        function startAutoSlide() {
-            interval = setInterval(() => {
-                currentPage++;
-                if (currentPage > totalPages) {
-                    currentPage = 1; // Loop back to first page
-                }
-                showPage(currentPage);
-            }, 5000); // Change page every 5 seconds
+            showPage(currentPage);
         }
 
         function showPage(pageNum) {
-            const pages = document.querySelectorAll(".page");
-            pages.forEach((page, index) => {
-                page.style.display = (index + 1 === pageNum) ? "block" : "none";
+            document.querySelector("#pages").innerHTML = "";
+            pdfDocument.getPage(pageNum).then(function(page) {
+                const canvas = document.createElement("canvas");
+                canvas.className = "page";
+                document.querySelector("#pages").appendChild(canvas);
+                const viewport = page.getViewport({ scale: curWidth / 100 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                page.render({
+                    canvasContext: canvas.getContext('2d'),
+                    viewport: viewport
+                }).promise.then(function() {
+                    console.log('Page rendered');
+                });
             });
+            updatePageButtons();
         }
 
-        var curWidth = 60;
+        function updatePageButtons() {
+            document.getElementById("prev-page").disabled = (currentPage === 1);
+            document.getElementById("next-page").disabled = (currentPage === totalPages);
+        }
+
+        document.getElementById("prev-page").onclick = function() {
+            if (currentPage > 1) {
+                currentPage--;
+                showPage(currentPage);
+            }
+        };
+
+        document.getElementById("next-page").onclick = function() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                showPage(currentPage);
+            }
+        };
 
         function zoomIn() {
             if (curWidth < 150) {
                 curWidth += 10;
-                updateZoom();
+                showPage(currentPage);
             }
         }
 
         function zoomOut() {
             if (curWidth > 20) {
                 curWidth -= 10;
-                updateZoom();
+                showPage(currentPage);
             }
         }
 
         function zoomReset() {
             curWidth = 60;
-            updateZoom();
+            showPage(currentPage);
         }
 
-        function updateZoom() {
-            document.querySelector("#zoom-percent").innerHTML = curWidth + "%";
-            document.querySelectorAll(".page").forEach(function(page) {
-                page.style.width = curWidth + "%";
-            });
-        }
-
-        document.querySelector("#zoom-in").onclick = zoomIn;
-        document.querySelector("#zoom-out").onclick = zoomOut;
-        document.querySelector("#zoom-reset").onclick = zoomReset;
+        document.getElementById("zoom-in").onclick = zoomIn;
+        document.getElementById("zoom-out").onclick = zoomOut;
+        document.getElementById("zoom-reset").onclick = zoomReset;
 
         // Start fetching the PDF
         fetchPDF(pdfUrl);
