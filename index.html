@@ -3,97 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic PDF Viewer</title>
+    <title>Dynamic PDF Selector</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.2/pdf.js"></script>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(to bottom, #f4f4f4, #eaeaea);
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 20px;
-        }
-        #pdf-list {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .pdf-item {
-            margin: 10px 0;
-        }
-        .pdf-button {
-            padding: 10px 15px;
-            font-size: 16px;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            background-color: #007bff;
-            color: white;
-            transition: background-color 0.3s, transform 0.2s;
-        }
-        .pdf-button:hover {
-            background-color: #0056b3;
-            transform: translateY(-2px);
-        }
-        #controls {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 20px;
-            padding: 10px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        #zoom-percent {
-            margin: 0 10px;
-            font-weight: bold;
-            font-size: 20px;
-            color: #333;
-        }
-        #pages {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
-        }
-        .page {
-            border: 2px solid #007bff;
-            border-radius: 8px;
-            margin: 10px 0;
-            background-color: white;
-            overflow: hidden;
-            transition: width 0.3s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-    </style>
 </head>
 <body>
-    <h1>Dynamic PDF Viewer</h1>
+    <h1>Dynamic PDF Selector</h1>
     <div id="pdf-list"></div>
-    <div id="controls" style="display: none;">
-        <button id="zoom-in"><i class="fas fa-search-plus"></i> Zoom In</button>
-        <div id="zoom-percent">60%</div>
-        <button id="zoom-out"><i class="fas fa-search-minus"></i> Zoom Out</button>
-        <button id="zoom-reset"><i class="fas fa-redo"></i> Reset Zoom</button>
-    </div>
-    <div id="pages"></div>
 
     <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.2/pdf.worker.js';
-
-        let pdfDocument = null;
-        let currentPage = 1;
-        const totalPages = 0;
-        let interval = null;
-
         // Load PDFs from JSON
         fetch('pdfs.json')
             .then(response => response.json())
@@ -101,119 +18,17 @@
                 const pdfList = document.getElementById('pdf-list');
                 data.forEach(pdf => {
                     const pdfItem = document.createElement('div');
-                    pdfItem.className = 'pdf-item';
                     pdfItem.innerHTML = `<span>${pdf.name}</span>
-                                         <button class="pdf-button" onclick="fetchPDF('${pdf.url}')">Open PDF</button>`;
+                                         <button onclick="openPDF('${pdf.url}')">Open PDF</button>`;
                     pdfList.appendChild(pdfItem);
                 });
             })
             .catch(error => console.error('Error loading JSON:', error));
 
-        function fetchPDF(url) {
-            document.getElementById("controls").style.display = "flex"; // Show controls
-            clearInterval(interval); // Clear any existing intervals
-            fetch(url)
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok: ' + response.statusText);
-                    return response.arrayBuffer();
-                })
-                .then(buffer => {
-                    const typedarray = new Uint8Array(buffer);
-                    pdfjsLib.getDocument(typedarray).promise.then(renderPDF);
-                })
-                .catch(error => {
-                    console.error('Error fetching PDF:', error);
-                    alert('Failed to load PDF: ' + error.message);
-                });
+        function openPDF(url) {
+            // Redirect to the viewer page with the PDF URL as a query parameter
+            window.location.href = `view.html?pdf=${encodeURIComponent(url)}`;
         }
-
-        function renderPDF(pdf) {
-            pdfDocument = pdf;
-            currentPage = 1;
-            document.querySelector("#pages").innerHTML = "";
-            zoomReset();
-            totalPages = pdf.numPages;
-
-            for (let i = 0; i < pdf.numPages; i++) {
-                (function(pageNum) {
-                    pdf.getPage(pageNum + 1).then(function(page) {
-                        const viewport = page.getViewport({ scale: 2.0 });
-                        const canvas = document.createElement("canvas");
-                        canvas.className = "page";
-                        document.querySelector("#pages").appendChild(canvas);
-                        canvas.height = viewport.height;
-                        canvas.width = viewport.width;
-
-                        page.render({
-                            canvasContext: canvas.getContext('2d'),
-                            viewport: viewport
-                        }).promise.then(function() {
-                            console.log('Page rendered');
-                        });
-                    });
-                })(i);
-            }
-            // Start automatic page navigation
-            startAutoSlide();
-        }
-
-        function startAutoSlide() {
-            interval = setInterval(() => {
-                currentPage++;
-                if (currentPage > totalPages) {
-                    currentPage = 1; // Loop back to first page
-                }
-                showPage(currentPage);
-            }, 5000); // Change page every 5 seconds
-        }
-
-        function showPage(pageNum) {
-            const pages = document.querySelectorAll(".page");
-            pages.forEach((page, index) => {
-                page.style.display = (index + 1 === pageNum) ? "block" : "none";
-            });
-        }
-
-        var curWidth = 60;
-
-        function zoomIn() {
-            if (curWidth < 150) {
-                curWidth += 10;
-                updateZoom();
-            }
-        }
-
-        function zoomOut() {
-            if (curWidth > 20) {
-                curWidth -= 10;
-                updateZoom();
-            }
-        }
-
-        function zoomReset() {
-            curWidth = 60;
-            updateZoom();
-        }
-
-        function updateZoom() {
-            document.querySelector("#zoom-percent").innerHTML = curWidth + "%";
-            document.querySelectorAll(".page").forEach(function(page) {
-                page.style.width = curWidth + "%";
-            });
-        }
-
-        document.querySelector("#zoom-in").onclick = zoomIn;
-        document.querySelector("#zoom-out").onclick = zoomOut;
-        document.querySelector("#zoom-reset").onclick = zoomReset;
-
-        window.onkeypress = function(e) {
-            if (e.code === "Equal") {
-                zoomIn();
-            }
-            if (e.code === "Minus") {
-                zoomOut();
-            }
-        };
     </script>
 </body>
 </html>
