@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.2/pdf.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(to bottom, #eaeaea, #f4f4f4);
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #007bff;
+        }
+        #controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        #controls button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        #controls button:hover {
+            background-color: #0056b3;
+            transform: translateY(-2px);
+        }
+        #pages {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 20px;
+        }
+        .page {
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            margin: 10px 0;
+            background-color: white;
+            overflow: hidden;
+            max-width: 100%;
+            position: relative;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #thumbnail-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .thumbnail {
+            border: 1px solid #ccc;
+            margin: 5px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+        .thumbnail:hover {
+            opacity: 1;
+        }
+        @media (max-width: 768px) {
+            #controls {
+                flex-direction: column;
+            }
+            .thumbnail {
+                width: 70px;
+                height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>PDF Viewer</h1>
+    <div id="controls">
+        <button id="prev-page"><i class="fas fa-chevron-left"></i> Previous</button>
+        <button id="next-page"><i class="fas fa-chevron-right"></i> Next</button>
+        <div id="zoom-controls">
+            <button id="zoom-in"><i class="fas fa-search-plus"></i></button>
+            <div id="zoom-percent">60%</div>
+            <button id="zoom-out"><i class="fas fa-search-minus"></i></button>
+            <button id="zoom-reset"><i class="fas fa-redo"></i></button>
+        </div>
+    </div>
+    <div id="pages"></div>
+    <div id="thumbnail-container"></div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const pdfUrl = urlParams.get('pdf');
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.2/pdf.worker.js';
+
+        let pdfDocument = null;
+        let currentPage = 1;
+        let totalPages = 0;
+        let curWidth = 60;
+
+        function fetchPDF(url) {
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.className = 'loading';
+            loadingIndicator.innerHTML = 'Loading...';
+            document.body.appendChild(loadingIndicator);
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok: ' + response.statusText);
+                    return response.arrayBuffer();
+                })
+                .then(buffer => {
+                    const typedarray = new Uint8Array(buffer);
+                    pdfjsLib.getDocument(typedarray).promise.then(renderPDF);
+                })
+                .catch(error => {
+                    console.error('Error fetching PDF:', error);
+                    alert('Failed to load PDF: ' + error.message);
+                })
+                .finally(() => {
+                    document.body.removeChild(loadingIndicator);
+                });
+        }
+
+        function renderPDF(pdf) {
+            pdfDocument = pdf;
+            totalPages = pdf.numPages;
+            showPage(currentPage);
+            renderThumbnails();
+        }
+
+        function showPage(pageNum) {
+            document.querySelector("#pages").innerHTML = "";
+            pdfDocument.getPage(pageNum).then(function(page) {
+                const canvas = document.createElement("canvas");
+                canvas.className = "page";
+                document.querySelector("#pages").appendChild(canvas);
+                const viewport = page.getViewport({ scale: curWidth / 100 });
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                page.render({
+                    canvasContext: canvas.getContext('2d'),
+                    viewport: viewport
+                }).promise.then(function() {
+                    console.log('Page rendered');
+                });
+            });
+            updatePageButtons();
+        }
+
+        function renderThumbnails() {
+            const container = document.getElementById("thumbnail-container");
+            container.innerHTML = ""; // Clear existing thumbnails
+            for (let i = 1; i <= totalPages; i++) {
+                const thumbnail = document.createElement("canvas");
+                thumbnail.className = "thumbnail";
+                thumbnail.style.width = "100px"; // Set a fixed width for thumbnails
+                container.appendChild(thumbnail);
+                
+                pdfDocument.getPage(i).then(page => {
+                    const viewport = page.getViewport({ scale: 0.2 }); // Scale for thumbnail
+                    thumbnail.height = viewport.height;
+                    thumbnail.width = viewport.width;
+
+                    page.render({
+                        canvasContext: thumbnail.getContext('2d'),
+                        viewport: viewport
+                    });
+
+                    // Add click event to thumbnails
+                    thumbnail.onclick = () => {
+                        currentPage = i;
+                        showPage(currentPage);
+                    };
+                });
+            }
+        }
+
+        function updatePageButtons() {
+            document.getElementById("prev-page").disabled = (currentPage === 1);
+            document.getElementById("next-page").disabled = (currentPage === totalPages);
+        }
+
+        document.getElementById("prev-page").onclick = function() {
+            if (currentPage > 1) {
+                currentPage--;
+                showPage(currentPage);
+            }
+        };
+
+        document.getElementById("next-page").onclick = function() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                showPage(currentPage);
+            }
+        };
+
+        function zoomIn() {
+            if (curWidth < 150) {
+                curWidth += 10;
+                showPage(currentPage);
+                document.getElementById("zoom-percent").innerText = `${curWidth}%`;
+            }
+        }
+
+        function zoomOut() {
+            if (curWidth > 20) {
+                curWidth -= 10;
+                showPage(currentPage);
+                document.getElementById("zoom-percent").innerText = `${curWidth}%`;
+            }
+        }
+
+        function zoomReset() {
+            curWidth = 60;
+            showPage(currentPage);
+            document.getElementById("zoom-percent").innerText = `${curWidth}%`;
+        }
+
+        document.getElementById("zoom-in").onclick = zoomIn;
+        document.getElementById("zoom-out").onclick = zoomOut;
+        document.getElementById("zoom-reset").onclick = zoomReset;
+
+        // Keyboard navigation
+        window.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowLeft') {
+                document.getElementById("prev-page").click();
+            } else if (event.key === 'ArrowRight') {
+                document.getElementById("next-page").click();
+            }
+        });
+
+        // Start fetching the PDF
+        fetchPDF(pdfUrl);
+    </script>
+</body>
+</html>
