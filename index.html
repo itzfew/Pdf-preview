@@ -3,106 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Viewer</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.2/pdf.js"></script>
+    <title>Dynamic PDF Selector</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background: #f4f4f4;
+            background-color: #f4f4f9;
             color: #333;
-            overflow: hidden; /* Prevent scroll bars on body */
-        }
-        #viewer {
-            height: 100vh;
-            overflow-y: auto;
+            margin: 0;
             padding: 20px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            background: white;
         }
-        .page {
-            margin: 20px 0;
-            position: relative;
+        h1 {
+            text-align: center;
+            color: #4a4a4a;
         }
-        .page-number {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 5px 10px;
-            border-radius: 5px;
+        #pdf-list {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .pdf-item {
+            background: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 10px;
+            padding: 15px;
+            width: 300px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        .pdf-item:hover {
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        .pdf-name {
             font-weight: bold;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        .open-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        .open-button:hover {
+            background-color: #0056b3;
+        }
+        .icon {
+            margin-right: 5px;
+        }
+        @media (max-width: 600px) {
+            #pdf-list {
+                width: 100%;
+                padding: 0 10px;
+            }
+            .pdf-item {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <div id="viewer"></div>
+    <h1>Dynamic PDF Selector</h1>
+    <div id="pdf-list"></div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const pdfUrl = urlParams.get('pdf');
-
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.2.2/pdf.worker.js';
-
-        let pdfDocument = null;
-        let totalPages = 0;
-        let curWidth = 100; // Initial zoom level
-
-        function fetchPDF(url) {
-            fetch(url)
-                .then(response => {
-                    if (!response.ok) throw new Error('Network response was not ok: ' + response.statusText);
-                    return response.arrayBuffer();
-                })
-                .then(buffer => {
-                    const typedarray = new Uint8Array(buffer);
-                    pdfjsLib.getDocument(typedarray).promise.then(renderPDF);
-                })
-                .catch(error => {
-                    console.error('Error fetching PDF:', error);
-                    alert('Failed to load PDF: ' + error.message);
+        // Load PDFs from JSON
+        fetch('pdfs.json')
+            .then(response => response.json())
+            .then(data => {
+                const pdfList = document.getElementById('pdf-list');
+                data.forEach(pdf => {
+                    const pdfItem = document.createElement('div');
+                    pdfItem.classList.add('pdf-item');
+                    pdfItem.innerHTML = `<span class="pdf-name">${pdf.name}</span>
+                                         <button class="open-button" onclick="openPDF('${pdf.url}')">
+                                             <i class="fas fa-file-pdf icon"></i> Open PDF
+                                         </button>`;
+                    pdfList.appendChild(pdfItem);
                 });
+            })
+            .catch(error => console.error('Error loading JSON:', error));
+
+        function openPDF(url) {
+            // Redirect to the viewer page with the PDF URL as a query parameter
+            window.location.href = `view.html?pdf=${encodeURIComponent(url)}`;
         }
-
-        function renderPDF(pdf) {
-            pdfDocument = pdf;
-            totalPages = pdf.numPages;
-            showPages();
-        }
-
-        function showPages() {
-            const viewer = document.getElementById("viewer");
-            viewer.innerHTML = ""; // Clear existing content
-
-            for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-                pdfDocument.getPage(pageNum).then(page => {
-                    const canvas = document.createElement("canvas");
-                    const viewport = page.getViewport({ scale: curWidth / 100 });
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
-
-                    const context = canvas.getContext('2d');
-                    page.render({ canvasContext: context, viewport: viewport }).promise.then(() => {
-                        const pageDiv = document.createElement("div");
-                        pageDiv.className = "page";
-                        pageDiv.appendChild(canvas);
-
-                        const pageNumber = document.createElement("div");
-                        pageNumber.className = "page-number";
-                        pageNumber.textContent = `Page ${pageNum} of ${totalPages}`;
-                        pageDiv.appendChild(pageNumber);
-
-                        viewer.appendChild(pageDiv);
-                    });
-                });
-            }
-        }
-
-        // Start fetching the PDF
-        fetchPDF(pdfUrl);
     </script>
 </body>
 </html>
