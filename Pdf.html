@@ -39,6 +39,10 @@
             background-color: #0056b3;
             transform: translateY(-2px);
         }
+        #page-info {
+            margin: 0 20px;
+            font-size: 18px;
+        }
         #pages {
             display: flex;
             flex-direction: column;
@@ -54,7 +58,7 @@
             max-width: 100%;
             position: relative;
             touch-action: pinch-zoom;
-            user-select: none; /* Prevent text selection */
+            user-select: none;
         }
         .loading {
             position: absolute;
@@ -76,6 +80,7 @@
             cursor: pointer;
             opacity: 0.7;
             transition: opacity 0.3s;
+            width: 80px; /* Fixed width for thumbnails */
         }
         .thumbnail:hover {
             opacity: 1;
@@ -85,8 +90,7 @@
                 flex-direction: column;
             }
             .thumbnail {
-                width: 70px;
-                height: auto;
+                width: 60px; /* Smaller thumbnails on mobile */
             }
         }
     </style>
@@ -95,7 +99,10 @@
     <h1>PDF Viewer</h1>
     <div id="controls">
         <button id="prev-page"><i class="fas fa-chevron-left"></i> Previous</button>
+        <span id="page-info">Page 1 of 0</span>
         <button id="next-page"><i class="fas fa-chevron-right"></i> Next</button>
+        <button id="download"><i class="fas fa-download"></i> Download</button>
+        <button id="fullscreen"><i class="fas fa-expand"></i> Fullscreen</button>
     </div>
     <div id="pages"></div>
     <div id="thumbnail-container"></div>
@@ -140,6 +147,7 @@
             totalPages = pdf.numPages;
             showPage(currentPage);
             renderThumbnails();
+            updatePageInfo();
         }
 
         function showPage(pageNum) {
@@ -160,6 +168,7 @@
                 });
             });
             updatePageButtons();
+            updatePageInfo();
         }
 
         function renderThumbnails() {
@@ -168,7 +177,6 @@
             for (let i = 1; i <= totalPages; i++) {
                 const thumbnail = document.createElement("canvas");
                 thumbnail.className = "thumbnail";
-                thumbnail.style.width = "100px"; // Set a fixed width for thumbnails
                 container.appendChild(thumbnail);
                 
                 pdfDocument.getPage(i).then(page => {
@@ -195,6 +203,10 @@
             document.getElementById("next-page").disabled = (currentPage === totalPages);
         }
 
+        function updatePageInfo() {
+            document.getElementById("page-info").textContent = `Page ${currentPage} of ${totalPages}`;
+        }
+
         document.getElementById("prev-page").onclick = function() {
             if (currentPage > 1) {
                 currentPage--;
@@ -209,7 +221,29 @@
             }
         };
 
-        // Handle pinch-to-zoom and mouse wheel zoom
+        // Download the PDF
+        document.getElementById("download").onclick = function() {
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = 'download.pdf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        // Toggle fullscreen
+        document.getElementById("fullscreen").onclick = function() {
+            const elem = document.documentElement;
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        };
+
+        // Handle mouse wheel zoom
         document.getElementById("pages").addEventListener('wheel', function(event) {
             event.preventDefault();
             if (event.deltaY < 0) {
@@ -226,6 +260,10 @@
                 document.getElementById("prev-page").click();
             } else if (event.key === 'ArrowRight') {
                 document.getElementById("next-page").click();
+            } else if (event.key === 'd' || event.key === 'D') {
+                document.getElementById("download").click();
+            } else if (event.key === 'f' || event.key === 'F') {
+                document.getElementById("fullscreen").click();
             }
         });
 
