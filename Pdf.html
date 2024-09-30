@@ -53,13 +53,16 @@
             overflow: hidden;
             max-width: 100%;
             position: relative;
-            touch-action: pinch-zoom; /* Enable pinch zoom */
+            touch-action: pinch-zoom;
+            user-select: none; /* Prevent text selection */
         }
         .loading {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #007bff;
         }
         #thumbnail-container {
             display: flex;
@@ -111,7 +114,7 @@
         function fetchPDF(url) {
             const loadingIndicator = document.createElement('div');
             loadingIndicator.className = 'loading';
-            loadingIndicator.innerHTML = 'Loading...';
+            loadingIndicator.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
             document.body.appendChild(loadingIndicator);
 
             fetch(url)
@@ -206,18 +209,14 @@
             }
         };
 
-        // Handle pinch-to-zoom on touch devices
-        let lastScale = 1;
-        let scale = 1;
-
+        // Handle pinch-to-zoom and mouse wheel zoom
         document.getElementById("pages").addEventListener('wheel', function(event) {
             event.preventDefault();
             if (event.deltaY < 0) {
-                scale += 0.1;
+                curWidth = Math.min(curWidth + 10, 150); // Max zoom
             } else {
-                scale = Math.max(0.2, scale - 0.1);
+                curWidth = Math.max(curWidth - 10, 20); // Min zoom
             }
-            curWidth = scale * 100;
             showPage(currentPage);
         });
 
